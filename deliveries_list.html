@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Deliveries{% endblock %}
+{% block content %}
+{% set active = "deliveries_list" %}
+<h2 class="page-title">Deliveries</h2>
+<div class="search-bar">
+    <form method="GET" style="display:flex; gap:8px;">
+        <input type="text" name="q" placeholder="Search delivery # or customer..." value="{{ search }}">
+        <button class="btn btn-blue" type="submit">Search</button>
+    </form>
+</div>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Delivery #</th><th>Date</th><th>Customer</th><th>Phone</th><th>Address</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody>
+{% for d in deliveries %}
+<tr>
+    <td>{{ d.delivery_no }}</td>
+    <td>{{ d.delivery_date }}</td>
+    <td>{{ d.customer_name }}</td>
+    <td>{{ d.phone }}</td>
+    <td>{{ d.address }}</td>
+    <td>
+        {% if d.status == 'Ready for Delivery' %}<span class="badge badge-ready">Ready</span>
+        {% elif d.status == 'Out for Delivery' %}<span class="badge badge-out">Out for Delivery</span>
+        {% else %}<span class="badge badge-delivered">Delivered</span>{% endif %}
+    </td>
+    <td><a href="{{ url_for('delivery_view', delivery_id=d.id) }}" class="btn btn-blue btn-sm">View / Print</a></td>
+</tr>
+{% else %}
+<tr><td colspan="7" style="text-align:center;">No deliveries yet.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

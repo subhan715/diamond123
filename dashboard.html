@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% set active = "dashboard" %}
+<h2 class="page-title">Dashboard</h2>
+<div class="page-sub">Overview of your business right now</div>
+
+<div class="cards">
+    <div class="card"><div class="bar" style="background:#2980b9"></div><div class="value">{{ stats.total_items }}</div><div class="label">Total Products</div></div>
+    <div class="card"><div class="bar" style="background:#8e44ad"></div><div class="value">{{ stats.total_pieces }}</div><div class="label">Total Pieces</div></div>
+    <div class="card"><div class="bar" style="background:#16a085"></div><div class="value">{{ "%.2f"|format(stats.total_area) }}</div><div class="label">Sq.Ft Left in Stock</div></div>
+    <div class="card"><div class="bar" style="background:#e67e22"></div><div class="value">{{ "%.2f"|format(stats.total_investment) }}</div><div class="label">💰 Investment (Cost of Stock)</div></div>
+    <div class="card"><div class="bar" style="background:#16a085"></div><div class="value">{{ "%.2f"|format(stats.total_value) }}</div><div class="label">Expected Stock Value</div></div>
+    <div class="card"><div class="bar" style="background:{{ '#c0392b' if stats.potential_profit < 0 else '#27ae60' }}"></div>
+        <div class="value" style="color:{{ '#c0392b' if stats.potential_profit < 0 else '#27ae60' }}">{{ "%.2f"|format(stats.potential_profit) }}</div>
+        <div class="label">Potential Profit (if all stock sells at asking price)</div></div>
+    <div class="card"><div class="bar" style="background:{{ '#c0392b' if stats.total_profit_alltime < 0 else '#27ae60' }}"></div>
+        <div class="value" style="color:{{ '#c0392b' if stats.total_profit_alltime < 0 else '#27ae60' }}">{{ "%.2f"|format(stats.total_profit_alltime) }}</div>
+        <div class="label">📈 Total Profit Earned (All-Time)</div></div>
+    <div class="card"><div class="bar" style="background:{{ '#c0392b' if stats.today_profit < 0 else '#27ae60' }}"></div>
+        <div class="value" style="color:{{ '#c0392b' if stats.today_profit < 0 else '#27ae60' }}">{{ "%.2f"|format(stats.today_profit) }}</div>
+        <div class="label">Today's Profit ({{ stats.today_count }} sale(s))</div></div>
+    <div class="card"><div class="bar" style="background:#27ae60"></div><div class="value">{{ "%.2f"|format(stats.today_sales) }}</div><div class="label">Today's Sales (Revenue)</div></div>
+    <div class="card"><div class="bar" style="background:#e67e22"></div><div class="value">{{ stats.low_stock }}</div><div class="label">Low Stock Items</div></div>
+    <div class="card"><div class="bar" style="background:#d35400"></div><div class="value">{{ stats.pending_orders }}</div><div class="label">Pending Orders</div></div>
+    <div class="card"><div class="bar" style="background:#2c3e50"></div><div class="value">{{ stats.pending_deliveries }}</div><div class="label">Pending Deliveries</div></div>
+</div>
+
+<h3 style="margin-top:30px;">Recent Sales — Profit Breakdown</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Total Sold</th><th>Cost</th><th>Profit / Loss</th><th>Margin</th></tr></thead>
+<tbody>
+{% for r in recent_profit %}
+<tr>
+    <td>{{ r.invoice_no }}</td>
+    <td>{{ r.invoice_date }}</td>
+    <td>{{ r.customer_name }}</td>
+    <td>{{ "%.2f"|format(r.total_amount) }}</td>
+    <td>{{ "%.2f"|format(r.total_amount - r.total_profit) }}</td>
+    <td style="color:{{ '#c0392b' if r.total_profit < 0 else '#16a085' }}; font-weight:bold;">
+        {{ "%.2f"|format(r.total_profit) }} {{ "(LOSS)" if r.total_profit < 0 }}
+    </td>
+    <td>{{ "%.1f"|format((r.total_profit / r.total_amount * 100) if r.total_amount else 0) }}%</td>
+</tr>
+{% else %}
+<tr><td colspan="7" style="text-align:center;">No sales yet.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<h3 style="margin-top:30px;">Low Stock Alerts <span style="font-size:13px; font-weight:normal; color:#7f8c8d;">(under 100 Sq.Ft left)</span></h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Product</th><th>Material</th><th>Color</th><th>Sq.Ft Left</th></tr></thead>
+<tbody>
+{% for it in low_stock %}
+<tr class="low-stock"><td>{{ it.item_name }}</td><td>{{ it.material_type }}</td><td>{{ it.color }}</td><td>{{ "%.2f"|format(it.sqft_left) }}</td></tr>
+{% else %}
+<tr><td colspan="4" style="text-align:center; color:#27ae60;">No low stock items ✅</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

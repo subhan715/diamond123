@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% block title %}New Order{% endblock %}
+{% block content %}
+{% set active = "orders_new" %}
+<h2 class="page-title">Place New Order</h2>
+<div class="page-sub">Write down what the customer wants. Stock is NOT deducted yet — it happens when you "Process" the order.</div>
+
+<div class="pos-split">
+    <div class="pos-left">
+        <div class="form-card" style="margin-bottom:14px;">
+            <h3 style="margin-top:0;">Add Item</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Product *</label>
+                    <select id="quickProduct">
+                        <option value="">-- Select Product --</option>
+                        {% for p in products %}
+                        <option value="{{ p.name }}" data-price="{{ p.selling_price_per_unit }}"
+                                data-cost="{{ p.purchase_price_per_unit }}" data-unit="{{ p.unit }}"
+                                data-area="{{ p.total_area }}">
+                            {{ p.name }}{{ " (" ~ p.material_type ~ (" · " ~ p.color if p.color else "") ~ ")" if p.material_type }} — {{ "%.2f"|format(p.total_area) }} {{ p.unit }} left
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Width (inches) *</label>
+                    <input type="number" step="0.01" min="0" id="quickWidth" placeholder="e.g. 24">
+                </div>
+                <div class="form-group">
+                    <label>Length (inches) *</label>
+                    <input type="number" step="0.01" min="0" id="quickLength" placeholder="e.g. 48">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Pieces</label>
+                    <input type="number" min="1" value="1" id="quickQty">
+                </div>
+                <div class="form-group">
+                    <label>Waste (extra Sq.Ft, optional)</label>
+                    <input type="number" step="0.01" min="0" value="0" id="quickWaste">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Square Feet (auto)</label>
+                    <input type="text" id="quickAreaDisplay" readonly value="0.00" style="background:#f4f6f7; font-weight:bold;">
+                </div>
+                <div class="form-group">
+                    <label>Price / Unit</label>
+                    <input type="number" step="0.01" id="quickPricePerUnit" title="Prefilled from the product's usual price — change to sell above/below it">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Total Price (auto)</label>
+                    <input type="text" id="quickTotalPrice" readonly value="0.00" style="background:#f4f6f7; font-weight:bold; color:#16a085;">
+                </div>
+            </div>
+            <button type="button" class="btn btn-green" style="width:100%;" onclick="quickAddToCart()">+ Add to Order</button>
+            <div id="quickStockNote" class="page-sub" style="margin-top:6px;"></div>
+        </div>
+
+        <details>
+            <summary style="cursor:pointer; color:#2980b9; margin-bottom:8px;">Show detailed stock &amp; sizes (advanced)</summary>
+        <input type="text" id="searchBox" placeholder="🔍 Search product..." style="width:100%; padding:9px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px;">
+        <table>
+            <thead><tr><th>Item</th><th>Area Left</th><th>Width</th><th>Length</th><th>Waste</th><th>Area</th><th>Qty</th><th>Price</th><th></th></tr></thead>
+            <tbody>
+            {% for product_name, batch_list in items|groupby('item_name') %}
+            <tr class="product-group-row" data-group="{{ loop.index }}">
+                <td colspan="9"><strong>{{ product_name }}</strong>
+                    <span class="page-sub" style="display:inline;">— {{ "%.2f"|format(batch_list|sum(attribute='total_area')) }} {{ batch_list[0].unit }} left across {{ batch_list|length }} size{{ 's' if batch_list|length != 1 }}</span>
+                </td>
+            </tr>
+            {% set grp = loop.index %}
+            {% for it in batch_list %}
+            <tr class="prod-row" data-group="{{ grp }}"
+                data-id="{{ it.id }}" data-name="{{ it.item_name }}" data-search="{{ (it.item_name ~ ' ' ~ it.material_type ~ ' ' ~ it.color)|lower }}"
+                data-pieces="{{ it.pieces }}" data-total-area="{{ it.total_area }}" data-width="{{ it.width }}" data-length="{{ it.length }}"
+                data-unit="{{ it.unit }}" data-area="{{ it.area_per_piece }}" data-price="{{ it.selling_price_per_unit }}"
+                data-cost="{{ it.purchase_price_per_unit }}">
+                <td title="{{ it.material_type }} · {{ it.color }} · Expected {{ "%.2f"|format(it.selling_price_per_unit) }}/{{ it.unit }}">{{ "%.2f"|format(it.width) }} x {{ "%.2f"|format(it.length) }} {{ it.unit }}</td>
+                <td>{{ "%.2f"|format(it.total_area) }}</td>
+                <td>
+                    <div class="stepper" style="width:88px;">
+                        <button type="button" class="dimStep" data-target="width" data-delta="-1">−</button>
+                        <input type="number" step="0.01" value="{{ "%.2f"|format(it.width) }}" style="width:46px;" class="widthInput" title="Custom width for this order (inches)">
+                        <button type="button" class="dimStep" data-target="width" data-delta="1">+</button>
+                    </div>
+                </td>
+                <td>
+                    <div class="stepper" style="width:88px;">
+                        <button type="button" class="dimStep" data-target="length" data-delta="-1">−</button>
+                        <input type="number" step="0.01" value="{{ "%.2f"|format(it.length) }}" style="width:46px;" class="lengthInput" title="Custom length for this order (inches)">
+                        <button type="button" class="dimStep" data-target="length" data-delta="1">+</button>
+                    </div>
+                </td>
+                <td>
+                    <input type="number" step="0.01" min="0" value="0" style="width:50px;" class="wasteInput" title="Extra area expected to be consumed by cutting waste">
+                </td>
+                <td class="billedAreaPreview" title="Ordered + Waste, in {{ it.unit }}">{{ "%.2f"|format(it.area_per_piece) }}</td>
+                <td><input type="number" min="1" value="1" style="width:44px;" class="qtyInput"></td>
+                <td><input type="number" step="0.01" value="{{ "%.2f"|format(it.selling_price_per_unit) }}" style="width:64px;" class="priceInput"
+                           title="Change this to sell above, below, or at the expected price"></td>
+                <td>
+                    <button type="button" class="btn btn-green btn-sm" onclick="addToCart(this)">Add</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr><td colspan="9" style="text-align:center;">No products in stock yet — add inventory first.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <div class="page-sub" style="margin-top:6px;">
+            Area = (Width × Length × Qty) + Waste. Hover an item name for material, color and expected price.
+        </div>
+        </details>
+    </div>
+
+    <div class="pos-right">
+        <h3>📝 Order Items</h3>
+        <table id="cartTable">
+            <thead><tr><th>Item</th><th>Size</th><th>Waste</th><th>Pcs</th><th>Price/Unit</th><th>Amount</th><th></th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div class="cart-total">Total: <span id="cartTotal">0.00</span></div>
+
+        <form method="POST" id="orderForm" enctype="multipart/form-data">
+            <input type="hidden" name="cart_data" id="cartData">
+            <div class="form-group"><label>Customer Name *</label><input type="text" name="customer_name" required></div>
+            <div class="form-group"><label>Phone</label><input type="text" name="phone"></div>
+            <div class="form-group"><label>Delivery Address</label><textarea name="address" rows="2"></textarea></div>
+            <div class="form-group"><label>Notes</label><textarea name="notes" rows="2" placeholder="Any special instructions..."></textarea></div>
+
+            <div class="form-group">
+                <label>📐 Drawing / Cutting Template (optional)</label>
+                <input type="file" name="drawing_file" id="drawingFileInput" accept=".png,.jpg,.jpeg,.webp,.pdf">
+                <div style="font-size:11px; color:#7f8c8d; margin-top:3px;">
+                    Upload a photo, sketch, or PDF of the client's kitchen/counter layout, sink &amp; hob
+                    cutouts, edge profile, or any custom shape — so the fabricator cuts it exactly right.
+                </div>
+
+                <div style="margin-top:10px; font-size:12px; color:#7f8c8d;">— OR draw it directly below —</div>
+
+                <div style="border:1px solid #ccc; border-radius:6px; padding:8px; margin-top:6px; background:#fafafa;">
+                    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:6px;">
+                        <label style="font-size:12px; margin:0;">Color:
+                            <input type="color" id="drawColor" value="#2c3e50" style="vertical-align:middle;">
+                        </label>
+                        <label style="font-size:12px; margin:0;">Brush:
+                            <input type="range" id="drawSize" min="1" max="12" value="3" style="vertical-align:middle;">
+                        </label>
+                        <button type="button" class="btn btn-gray btn-sm" onclick="undoStroke()">↩ Undo</button>
+                        <button type="button" class="btn btn-gray btn-sm" onclick="clearCanvas()">🗑 Clear</button>
+                    </div>
+                    <canvas id="drawCanvas" width="480" height="320"
+                            style="width:100%; max-width:480px; height:320px; background:#fff; border:1px solid #ddd; border-radius:4px; touch-action:none; cursor:crosshair; display:block;"></canvas>
+                    <div style="font-size:11px; color:#7f8c8d; margin-top:3px;">
+                        Sketch the shape, cutout position, or layout with your mouse/finger. This is saved
+                        with the order automatically if you draw anything here.
+                    </div>
+                </div>
+                <input type="hidden" name="drawing_canvas_data" id="drawingCanvasData">
+            </div>
+            <div class="form-group">
+                <label>Drawing Notes / Cutting Instructions</label>
+                <textarea name="drawing_notes" rows="2" placeholder="e.g. sink cutout 33x19 in, left corner; 2cm bullnose edge on front..."></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-orange" style="width:100%; padding:14px; margin-top:10px;" onclick="return prepareOrder();">📝 Place Order</button>
+        </form>
+    </div>
+</div>
+
+<script>
+// ---------------- Drawing canvas ----------------
+const drawCanvas = document.getElementById('drawCanvas');
+const drawCtx = drawCanvas.getContext('2d');
+let drawing = false;
+let hasDrawn = false;
+let strokes = []; // for undo: list of {x,y}[] paths
+let currentStroke = null;
+
+function fillWhite() {
+    drawCtx.fillStyle = '#ffffff';
+    drawCtx.fillRect(0, 0, drawCanvas.width, drawCanvas.height);
+}
+fillWhite();
+
+function getPos(e) {
+    const rect = drawCanvas.getBoundingClientRect();
+    const scaleX = drawCanvas.width / rect.width;
+    const scaleY = drawCanvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+}
+function startDraw(e) {
+    e.preventDefault();
+    drawing = true;
+    hasDrawn = true;
+    const pos = getPos(e);
+    currentStroke = { color: document.getElementById('drawColor').value, size: document.getElementById('drawSize').value, points: [pos] };
+    drawCtx.beginPath();
+    drawCtx.moveTo(pos.x, pos.y);
+}
+function moveDraw(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    currentStroke.points.push(pos);
+    drawCtx.lineTo(pos.x, pos.y);
+    drawCtx.strokeStyle = currentStroke.color;
+    drawCtx.lineWidth = currentStroke.size;
+    drawCtx.lineCap = 'round';
+    drawCtx.lineJoin = 'round';
+    drawCtx.stroke();
+}
+function endDraw(e) {
+    if (!drawing) return;
+    drawing = false;
+    if (currentStroke && currentStroke.points.length > 1) strokes.push(currentStroke);
+    currentStroke = null;
+}
+drawCanvas.addEventListener('mousedown', startDraw);
+drawCanvas.addEventListener('mousemove', moveDraw);
+window.addEventListener('mouseup', endDraw);
+drawCanvas.addEventListener('touchstart', startDraw);
+drawCanvas.addEventListener('touchmove', moveDraw);
+drawCanvas.addEventListener('touchend', endDraw);
+
+function redrawAll() {
+    fillWhite();
+    strokes.forEach(s => {
+        drawCtx.beginPath();
+        drawCtx.strokeStyle = s.color;
+        drawCtx.lineWidth = s.size;
+        drawCtx.lineCap = 'round';
+        drawCtx.lineJoin = 'round';
+        s.points.forEach((p, i) => { i === 0 ? drawCtx.moveTo(p.x, p.y) : drawCtx.lineTo(p.x, p.y); });
+        drawCtx.stroke();
+    });
+}
+function undoStroke() {
+    strokes.pop();
+    redrawAll();
+    hasDrawn = strokes.length > 0;
+}
+function clearCanvas() {
+    strokes = [];
+    fillWhite();
+    hasDrawn = false;
+}
+// ---------------- End drawing canvas ----------------
+
+let cart = [];
+document.getElementById('searchBox').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.prod-row').forEach(row => {
+        row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+    });
+    document.querySelectorAll('.product-group-row').forEach(headerRow => {
+        const grp = headerRow.dataset.group;
+        const anyVisible = Array.from(document.querySelectorAll('.prod-row[data-group="' + grp + '"]'))
+            .some(r => r.style.display !== 'none');
+        headerRow.style.display = anyVisible ? '' : 'none';
+    });
+});
+
+function areaPerPieceForRow(row) {
+    const unit = row.dataset.unit;
+    const w = parseFloat(row.querySelector('.widthInput').value) || 0;
+    const l = parseFloat(row.querySelector('.lengthInput').value) || 0;
+    return unit === 'Sq.Ft' ? (w * l) / 144.0 : (w * 0.0254) * (l * 0.0254);
+}
+function updatePreview(row) {
+    const qty = parseInt(row.querySelector('.qtyInput').value) || 0;
+    const orderedArea = areaPerPieceForRow(row) * qty;
+    const waste = parseFloat(row.querySelector('.wasteInput').value) || 0;
+    row.querySelector('.billedAreaPreview').innerText = (orderedArea + waste).toFixed(2);
+}
+document.querySelectorAll('.prod-row').forEach(row => {
+    row.querySelectorAll('.widthInput, .lengthInput, .wasteInput, .qtyInput').forEach(inp => {
+        inp.addEventListener('input', () => updatePreview(row));
+    });
+    row.querySelectorAll('.dimStep').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.target === 'width' ? row.querySelector('.widthInput') : row.querySelector('.lengthInput');
+            const delta = parseFloat(btn.dataset.delta);
+            let v = parseFloat(target.value) || 0;
+            v = Math.max(0, v + delta);
+            target.value = v.toFixed(2);
+            updatePreview(row);
+        });
+    });
+});
+
+function addToCart(btn) {
+    const row = btn.closest('tr');
+    const qtyInput = row.querySelector('.qtyInput');
+    const priceInput = row.querySelector('.priceInput');
+    const qty = parseInt(qtyInput.value) || 0;
+    if (qty <= 0) { alert('Enter a quantity greater than 0.'); return; }
+
+    const width = parseFloat(row.querySelector('.widthInput').value) || 0;
+    const length = parseFloat(row.querySelector('.lengthInput').value) || 0;
+    if (width <= 0 || length <= 0) { alert('Width and Length must be greater than 0.'); return; }
+    const waste = parseFloat(row.querySelector('.wasteInput').value) || 0;
+    if (waste < 0) { alert('Waste cannot be negative.'); return; }
+
+    const orderedArea = areaPerPieceForRow(row) * qty;
+    const area = orderedArea + waste;
+    const price = parseFloat(priceInput.value) || 0;
+    const cost = parseFloat(row.dataset.cost) || 0;
+    const amount = area * price;
+
+    if (price < cost) {
+        if (!confirm('This price is BELOW the purchase cost — this item will be sold at a LOSS. Continue anyway?')) {
+            return;
+        }
+    }
+
+    cart.push({
+        inventory_id: parseInt(row.dataset.id), item_name: row.dataset.name, pieces: qty,
+        width: width, length: length,
+        unit: row.dataset.unit, waste: waste, area: area, price_per_unit: price, amount: amount
+    });
+    renderCart();
+    qtyInput.value = 1;
+    priceInput.value = row.dataset.price;
+    row.querySelector('.widthInput').value = parseFloat(row.dataset.width).toFixed(2);
+    row.querySelector('.lengthInput').value = parseFloat(row.dataset.length).toFixed(2);
+    row.querySelector('.wasteInput').value = 0;
+    updatePreview(row);
+}
+function removeFromCart(idx) { cart.splice(idx, 1); renderCart(); }
+function renderCart() {
+    const tbody = document.querySelector('#cartTable tbody');
+    tbody.innerHTML = '';
+    let total = 0;
+    cart.forEach((it, idx) => {
+        total += it.amount;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${it.item_name}</td><td>${it.width.toFixed(2)} x ${it.length.toFixed(2)}</td><td>${it.waste.toFixed(2)}</td><td>${it.pieces}</td><td>${it.price_per_unit.toFixed(2)}</td>
+                         <td>${it.amount.toFixed(2)}</td>
+                         <td><button type="button" class="btn btn-red btn-sm" onclick="removeFromCart(${idx})">✕</button></td>`;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('cartTotal').innerText = total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function prepareOrder() {
+    if (cart.length === 0) { alert('Add at least one item to the order first.'); return false; }
+    document.getElementById('cartData').value = JSON.stringify(cart);
+    if (hasDrawn) {
+        document.getElementById('drawingCanvasData').value = drawCanvas.toDataURL('image/png');
+    }
+    return true;
+}
+
+// ---------------- Quick Add (select Product, type Width/Length) ----------------
+function quickAreaPerPiece() {
+    const opt = document.getElementById('quickProduct').selectedOptions[0];
+    const unit = opt ? opt.dataset.unit : 'Sq.Ft';
+    const w = parseFloat(document.getElementById('quickWidth').value) || 0;
+    const l = parseFloat(document.getElementById('quickLength').value) || 0;
+    return unit === 'Sq.Ft' ? (w * l) / 144.0 : (w * 0.0254) * (l * 0.0254);
+}
+
+function recalcQuick() {
+    const qty = parseInt(document.getElementById('quickQty').value) || 0;
+    const waste = parseFloat(document.getElementById('quickWaste').value) || 0;
+    const area = (quickAreaPerPiece() * qty) + waste;
+    document.getElementById('quickAreaDisplay').value = area.toFixed(2);
+    const pricePerUnit = parseFloat(document.getElementById('quickPricePerUnit').value) || 0;
+    document.getElementById('quickTotalPrice').value = (area * pricePerUnit).toFixed(2);
+}
+
+document.getElementById('quickProduct').addEventListener('change', function() {
+    const opt = this.selectedOptions[0];
+    const note = document.getElementById('quickStockNote');
+    if (!opt || !opt.value) { note.innerText = ''; return; }
+    document.getElementById('quickPricePerUnit').value = parseFloat(opt.dataset.price).toFixed(2);
+    note.innerText = parseFloat(opt.dataset.area).toFixed(2) + ' ' + opt.dataset.unit + ' currently in stock (orders can still be placed beyond this — stock is only checked when you Process the order).';
+    recalcQuick();
+});
+['quickWidth','quickLength','quickQty','quickWaste','quickPricePerUnit'].forEach(id => {
+    document.getElementById(id).addEventListener('input', recalcQuick);
+});
+
+// Orders don't need to fit within CURRENT stock (that's checked later, when
+// the order is Processed) - but we still need one real batch id to attach
+// the line to. Prefer one with enough area left whose slab size can fit the
+// cut (either orientation); otherwise any with enough area; otherwise the
+// one with the most area left.
+function findBatchForProduct(productName, areaNeeded, reqWidth, reqLength) {
+    const rows = Array.from(document.querySelectorAll('.prod-row')).filter(r => r.dataset.name === productName);
+    if (rows.length === 0) return null;
+    const left = r => parseFloat(r.dataset.totalArea) || 0;
+    const fits = (row) => {
+        const bw = parseFloat(row.dataset.width), bl = parseFloat(row.dataset.length);
+        return (bw >= reqWidth && bl >= reqLength) || (bw >= reqLength && bl >= reqWidth);
+    };
+    let candidate = rows.find(r => left(r) >= areaNeeded && fits(r));
+    if (!candidate) candidate = rows.find(r => left(r) >= areaNeeded);
+    if (!candidate) candidate = rows.slice().sort((x, y) => left(y) - left(x))[0];
+    return candidate;
+}
+
+function quickAddToCart() {
+    const opt = document.getElementById('quickProduct').selectedOptions[0];
+    if (!opt || !opt.value) { alert('Please select a Product.'); return; }
+    const productName = opt.value;
+
+    const qty = parseInt(document.getElementById('quickQty').value) || 0;
+    if (qty <= 0) { alert('Enter a quantity greater than 0.'); return; }
+
+    const width = parseFloat(document.getElementById('quickWidth').value) || 0;
+    const length = parseFloat(document.getElementById('quickLength').value) || 0;
+    if (width <= 0 || length <= 0) { alert('Enter Width and Length greater than 0.'); return; }
+
+    const waste = parseFloat(document.getElementById('quickWaste').value) || 0;
+    if (waste < 0) { alert('Waste cannot be negative.'); return; }
+
+    const orderedArea = quickAreaPerPiece() * qty;
+    const area = orderedArea + waste;
+    const row = findBatchForProduct(productName, area, width, length);
+    if (!row) {
+        alert(productName + ' has no stock batches yet — add inventory for it first.');
+        return;
+    }
+
+    const price = parseFloat(document.getElementById('quickPricePerUnit').value) || 0;
+    const cost = parseFloat(row.dataset.cost) || 0;
+    const amount = area * price;
+
+    if (price < cost) {
+        if (!confirm('This price is BELOW the purchase cost — this item will be sold at a LOSS. Continue anyway?')) {
+            return;
+        }
+    }
+
+    cart.push({
+        inventory_id: parseInt(row.dataset.id), item_name: productName, pieces: qty,
+        width: width, length: length,
+        unit: row.dataset.unit, waste: waste, area: area, price_per_unit: price, amount: amount
+    });
+    renderCart();
+
+    document.getElementById('quickProduct').value = '';
+    document.getElementById('quickWidth').value = '';
+    document.getElementById('quickLength').value = '';
+    document.getElementById('quickQty').value = 1;
+    document.getElementById('quickWaste').value = 0;
+    document.getElementById('quickPricePerUnit').value = '';
+    document.getElementById('quickAreaDisplay').value = '0.00';
+    document.getElementById('quickTotalPrice').value = '0.00';
+    document.getElementById('quickStockNote').innerText = '';
+}
+</script>
+{% endblock %}

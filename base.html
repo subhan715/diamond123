@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Diamond Marble & Granite{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" href="{{ url_for('static', filename='logo.jpg') }}">
+</head>
+<body>
+<div class="layout">
+    <div class="sidebar">
+        <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Diamond Marble & Granite" class="sidebar-logo">
+        <h1>Diamond Marble &amp; Granite</h1>
+        <div class="subtitle">Online Inventory &amp; POS</div>
+        <nav>
+            <a href="{{ url_for('dashboard') }}" class="{{ 'active' if active=='dashboard' }}">📊 Dashboard</a>
+            <a href="{{ url_for('inventory_add') }}" class="{{ 'active' if active=='inventory_add' }}">➕ Add Inventory</a>
+            <a href="{{ url_for('inventory_list') }}" class="{{ 'active' if active=='inventory_list' }}">📦 Inventory List</a>
+            <a href="{{ url_for('pos') }}" class="{{ 'active' if active=='pos' }}">🛒 Point of Sale</a>
+            <a href="{{ url_for('orders_new') }}" class="{{ 'active' if active=='orders_new' }}">📝 New Order</a>
+            <a href="{{ url_for('orders_list') }}" class="{{ 'active' if active=='orders_list' }}">📋 Orders</a>
+            <a href="{{ url_for('invoices_list') }}" class="{{ 'active' if active=='invoices_list' }}">🧾 Invoices</a>
+            <a href="{{ url_for('deliveries_list') }}" class="{{ 'active' if active=='deliveries_list' }}">🚚 Deliveries</a>
+            <a href="{{ url_for('backup_page') }}" class="{{ 'active' if active=='backup_page' }}">💾 Backup &amp; Restore{{ ' 🔒' if TRIAL_MODE }}</a>
+        </nav>
+        <div class="footer">
+            {% if session.get('username') %}Logged in as <b>{{ session.get('username') }}</b><br>{% endif %}
+            <a href="{{ url_for('logout') }}" style="color:#e74c3c;">🔒 Log Out</a><br>
+            Runs on your network<br>Data stored on your server
+        </div>
+    </div>
+    <div class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, msg in messages %}
+                    <div class="flash flash-{{ 'error' if category=='error' else 'success' }}">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+</div>
+</body>
+</html>

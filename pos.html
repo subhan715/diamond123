@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% block title %}Point of Sale{% endblock %}
+{% block content %}
+{% set active = "pos" %}
+<h2 class="page-title">Point of Sale</h2>
+<div class="page-sub">Counter sale — set Width/Length for a custom-cut size, add any cutting Waste; only the ordered + wasted area leaves stock</div>
+
+<div class="pos-split">
+    <div class="pos-left">
+        <div class="form-card" style="margin-bottom:14px;">
+            <h3 style="margin-top:0;">Add Item</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Product *</label>
+                    <select id="quickProduct">
+                        <option value="">-- Select Product --</option>
+                        {% for p in products %}
+                        <option value="{{ p.name }}" data-price="{{ p.selling_price_per_unit }}"
+                                data-cost="{{ p.purchase_price_per_unit }}" data-unit="{{ p.unit }}"
+                                data-area="{{ p.total_area }}">
+                            {{ p.name }}{{ " (" ~ p.material_type ~ (" · " ~ p.color if p.color else "") ~ ")" if p.material_type }} — {{ "%.2f"|format(p.total_area) }} {{ p.unit }} left
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Width (inches) *</label>
+                    <input type="number" step="0.01" min="0" id="quickWidth" placeholder="e.g. 24">
+                </div>
+                <div class="form-group">
+                    <label>Length (inches) *</label>
+                    <input type="number" step="0.01" min="0" id="quickLength" placeholder="e.g. 48">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Pieces</label>
+                    <input type="number" min="1" value="1" id="quickQty">
+                </div>
+                <div class="form-group">
+                    <label>Waste (extra Sq.Ft, optional)</label>
+                    <input type="number" step="0.01" min="0" value="0" id="quickWaste">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Square Feet (auto)</label>
+                    <input type="text" id="quickAreaDisplay" readonly value="0.00" style="background:#f4f6f7; font-weight:bold;">
+                </div>
+                <div class="form-group">
+                    <label>Price / Unit</label>
+                    <input type="number" step="0.01" id="quickPricePerUnit" title="Prefilled from the product's usual price — change to sell above/below it">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Total Price (auto)</label>
+                    <input type="text" id="quickTotalPrice" readonly value="0.00" style="background:#f4f6f7; font-weight:bold; color:#16a085;">
+                </div>
+            </div>
+            <button type="button" class="btn btn-green" style="width:100%;" onclick="quickAddToCart()">+ Add to Cart</button>
+            <div id="quickStockNote" class="page-sub" style="margin-top:6px;"></div>
+        </div>
+
+        <details>
+            <summary style="cursor:pointer; color:#2980b9; margin-bottom:8px;">Show detailed stock &amp; sizes (advanced)</summary>
+        <input type="text" id="searchBox" placeholder="🔍 Search product..." style="width:100%; padding:9px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px;">
+        <table id="prodTable">
+            <thead><tr>
+                <th>Item</th><th>Area Left</th><th>Width</th><th>Length</th><th>Waste</th><th>Area</th><th>Qty</th><th>Price</th><th></th>
+            </tr></thead>
+            <tbody>
+            {% for product_name, batch_list in items|groupby('item_name') %}
+            <tr class="product-group-row" data-group="{{ loop.index }}">
+                <td colspan="9"><strong>{{ product_name }}</strong>
+                    <span class="page-sub" style="display:inline;">— {{ "%.2f"|format(batch_list|sum(attribute='total_area')) }} {{ batch_list[0].unit }} left across {{ batch_list|length }} size{{ 's' if batch_list|length != 1 }}</span>
+                </td>
+            </tr>
+            {% set grp = loop.index %}
+            {% for it in batch_list %}
+            <tr class="prod-row" data-group="{{ grp }}"
+                data-id="{{ it.id }}" data-name="{{ it.item_name }}" data-search="{{ (it.item_name ~ ' ' ~ it.material_type ~ ' ' ~ it.color)|lower }}"
+                data-pieces="{{ it.pieces }}" data-total-area="{{ it.total_area }}" data-width="{{ it.width }}" data-length="{{ it.length }}"
+                data-unit="{{ it.unit }}" data-area="{{ it.area_per_piece }}" data-price="{{ it.selling_price_per_unit }}"
+                data-cost="{{ it.purchase_price_per_unit }}">
+                <td title="{{ it.material_type }} · {{ it.color }} · Expected {{ "%.2f"|format(it.selling_price_per_unit) }}/{{ it.unit }}">{{ "%.2f"|format(it.width) }} x {{ "%.2f"|format(it.length) }} {{ it.unit }}</td>
+                <td>{{ "%.2f"|format(it.total_area) }}</td>
+                <td>
+                    <div class="stepper" style="width:88px;">
+                        <button type="button" class="dimStep" data-target="width" data-delta="-1">−</button>
+                        <input type="number" step="0.01" value="{{ "%.2f"|format(it.width) }}" style="width:46px;" class="widthInput" title="Custom width for this sale (inches)">
+                        <button type="button" class="dimStep" data-target="width" data-delta="1">+</button>
+                    </div>
+                </td>
+                <td>
+                    <div class="stepper" style="width:88px;">
+                        <button type="button" class="dimStep" data-target="length" data-delta="-1">−</button>
+                        <input type="number" step="0.01" value="{{ "%.2f"|format(it.length) }}" style="width:46px;" class="lengthInput" title="Custom length for this sale (inches)">
+                        <button type="button" class="dimStep" data-target="length" data-delta="1">+</button>
+                    </div>
+                </td>
+                <td>
+                    <input type="number" step="0.01" min="0" value="0" style="width:50px;" class="wasteInput" title="Extra area consumed by cutting waste">
+                </td>
+                <td class="billedAreaPreview" title="Ordered + Waste, in {{ it.unit }}">{{ "%.2f"|format(it.area_per_piece) }}</td>
+                <td><input type="number" min="1" value="1" style="width:44px;" class="qtyInput"></td>
+                <td><input type="number" step="0.01" value="{{ "%.2f"|format(it.selling_price_per_unit) }}" style="width:64px;" class="priceInput"
+                           title="Expected {{ "%.2f"|format(it.selling_price_per_unit) }} — change to sell above/below that"></td>
+                <td>
+                    <button type="button" class="btn btn-green btn-sm" onclick="addToCart(this)">Add</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr><td colspan="9" style="text-align:center;">No products in stock yet — add inventory first.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <div class="page-sub" style="margin-top:6px;">
+            Area = (Width × Length × Qty) + Waste — that's what the customer is charged for and what leaves stock. Hover an item name for material, color and expected price.
+        </div>
+        </details>
+    </div>
+
+    <div class="pos-right">
+        <h3>🛒 Cart</h3>
+        <table id="cartTable">
+            <thead><tr><th>Item</th><th>Size</th><th>Waste</th><th>Pcs</th><th>Price/Unit</th><th>Amount</th><th>Profit</th><th></th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div class="cart-total">Total: <span id="cartTotal">0.00</span></div>
+
+        <form method="POST" action="{{ url_for('pos_checkout') }}" id="checkoutForm">
+            <input type="hidden" name="cart_data" id="cartData">
+            <div class="form-group"><label>Customer Name</label><input type="text" name="customer_name" placeholder="Walk-in Customer"></div>
+            <div class="form-group"><label>Phone</label><input type="text" name="phone"></div>
+            <div class="form-group">
+                <label>Payment Method</label>
+                <select name="payment_method">
+                    <option>Cash</option><option>Bank Transfer</option><option>Credit Sale</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-red" style="width:100%; padding:14px; margin-top:10px;" onclick="return prepareCheckout();">✔ Checkout &amp; Deduct Stock</button>
+        </form>
+    </div>
+</div>
+
+<script>
+let cart = [];
+
+document.getElementById('searchBox').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.prod-row').forEach(row => {
+        row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+    });
+    document.querySelectorAll('.product-group-row').forEach(headerRow => {
+        const grp = headerRow.dataset.group;
+        const anyVisible = Array.from(document.querySelectorAll('.prod-row[data-group="' + grp + '"]'))
+            .some(r => r.style.display !== 'none');
+        headerRow.style.display = anyVisible ? '' : 'none';
+    });
+});
+
+function areaPerPieceForRow(row) {
+    const unit = row.dataset.unit;
+    const w = parseFloat(row.querySelector('.widthInput').value) || 0;
+    const l = parseFloat(row.querySelector('.lengthInput').value) || 0;
+    // Same formula used on the Add Inventory page: dimensions are entered
+    // in inches; Sq.Meter converts inches to meters before multiplying.
+    return unit === 'Sq.Ft' ? (w * l) / 144.0 : (w * 0.0254) * (l * 0.0254);
+}
+
+function updatePreview(row) {
+    const qty = parseInt(row.querySelector('.qtyInput').value) || 0;
+    const orderedArea = areaPerPieceForRow(row) * qty;
+    const waste = parseFloat(row.querySelector('.wasteInput').value) || 0;
+    row.querySelector('.billedAreaPreview').innerText = (orderedArea + waste).toFixed(2);
+}
+
+document.querySelectorAll('.prod-row').forEach(row => {
+    row.querySelectorAll('.widthInput, .lengthInput, .wasteInput, .qtyInput').forEach(inp => {
+        inp.addEventListener('input', () => updatePreview(row));
+    });
+    row.querySelectorAll('.dimStep').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.target === 'width' ? row.querySelector('.widthInput') : row.querySelector('.lengthInput');
+            const delta = parseFloat(btn.dataset.delta);
+            let v = parseFloat(target.value) || 0;
+            v = Math.max(0, v + delta);
+            target.value = v.toFixed(2);
+            updatePreview(row);
+        });
+    });
+});
+
+// ---- stock is tracked in square feet left (per product, all size batches together)
+function productAreaLeft(name, unit) {
+    return Array.from(document.querySelectorAll('.prod-row'))
+        .filter(r => r.dataset.name === name && r.dataset.unit === unit)
+        .reduce((sum, r) => sum + (parseFloat(r.dataset.totalArea) || 0), 0);
+}
+function areaAlreadyInCart(name, unit) {
+    return cart.filter(c => c.item_name === name && c.unit === unit).reduce((sum, c) => sum + c.area, 0);
+}
+function hasEnoughArea(name, unit, areaNeeded) {
+    const left = productAreaLeft(name, unit) - areaAlreadyInCart(name, unit);
+    if (areaNeeded > left + 0.000001) {
+        alert('Insufficient Stock — only ' + Math.max(0, left).toFixed(2) + ' ' + unit + ' of ' + name + ' left' +
+              (areaAlreadyInCart(name, unit) > 0 ? ' (after what is already in the cart).' : '.'));
+        return false;
+    }
+    return true;
+}
+
+function addToCart(btn) {
+    const row = btn.closest('tr');
+    const qtyInput = row.querySelector('.qtyInput');
+    const priceInput = row.querySelector('.priceInput');
+    const qty = parseInt(qtyInput.value) || 0;
+    if (qty <= 0) { alert('Enter a quantity greater than 0.'); return; }
+
+    const width = parseFloat(row.querySelector('.widthInput').value) || 0;
+    const length = parseFloat(row.querySelector('.lengthInput').value) || 0;
+    if (width <= 0 || length <= 0) { alert('Width and Length must be greater than 0.'); return; }
+    const waste = parseFloat(row.querySelector('.wasteInput').value) || 0;
+    if (waste < 0) { alert('Waste cannot be negative.'); return; }
+
+    const orderedArea = areaPerPieceForRow(row) * qty;
+    const area = orderedArea + waste;
+    if (!hasEnoughArea(row.dataset.name, row.dataset.unit, area)) return;          // billed AND deducted from stock
+    const price = parseFloat(priceInput.value) || 0;
+    const cost = parseFloat(row.dataset.cost) || 0;
+    const amount = area * price;
+    const profit = (price - cost) * area;
+
+    if (price < cost) {
+        if (!confirm('This sale price is BELOW the purchase cost — you will make a LOSS of ' +
+                      Math.abs(profit).toFixed(2) + ' on this item. Continue anyway?')) {
+            return;
+        }
+    }
+
+    cart.push({
+        inventory_id: parseInt(row.dataset.id),
+        item_name: row.dataset.name,
+        pieces: qty,
+        width: width,
+        length: length,
+        unit: row.dataset.unit,
+        waste: waste,
+        area: area,
+        price_per_unit: price,
+        amount: amount,
+        _profit_preview: profit
+    });
+    renderCart();
+    qtyInput.value = 1;
+    priceInput.value = row.dataset.price;
+    row.querySelector('.widthInput').value = parseFloat(row.dataset.width).toFixed(2);
+    row.querySelector('.lengthInput').value = parseFloat(row.dataset.length).toFixed(2);
+    row.querySelector('.wasteInput').value = 0;
+    updatePreview(row);
+}
+
+function removeFromCart(idx) {
+    cart.splice(idx, 1);
+    renderCart();
+}
+
+function renderCart() {
+    const tbody = document.querySelector('#cartTable tbody');
+    tbody.innerHTML = '';
+    let total = 0;
+    cart.forEach((it, idx) => {
+        total += it.amount;
+        const tr = document.createElement('tr');
+        const profitColor = it._profit_preview < 0 ? '#c0392b' : '#16a085';
+        tr.innerHTML = `<td>${it.item_name}</td><td>${it.width.toFixed(2)} x ${it.length.toFixed(2)}</td><td>${it.waste.toFixed(2)}</td><td>${it.pieces}</td><td>${it.price_per_unit.toFixed(2)}</td>
+                         <td>${it.amount.toFixed(2)}</td>
+                         <td style="color:${profitColor}; font-weight:bold;">${it._profit_preview.toFixed(2)}</td>
+                         <td><button type="button" class="btn btn-red btn-sm" onclick="removeFromCart(${idx})">✕</button></td>`;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('cartTotal').innerText = total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function prepareCheckout() {
+    if (cart.length === 0) { alert('Add at least one item to the cart first.'); return false; }
+    document.getElementById('cartData').value = JSON.stringify(cart);
+    return confirm('Complete this sale? Stock will be deducted immediately.');
+}
+
+// ---------------- Quick Add (select Product, type Width/Length) ----------------
+function quickAreaPerPiece() {
+    const opt = document.getElementById('quickProduct').selectedOptions[0];
+    const unit = opt ? opt.dataset.unit : 'Sq.Ft';
+    const w = parseFloat(document.getElementById('quickWidth').value) || 0;
+    const l = parseFloat(document.getElementById('quickLength').value) || 0;
+    return unit === 'Sq.Ft' ? (w * l) / 144.0 : (w * 0.0254) * (l * 0.0254);
+}
+
+function recalcQuick() {
+    const qty = parseInt(document.getElementById('quickQty').value) || 0;
+    const waste = parseFloat(document.getElementById('quickWaste').value) || 0;
+    const area = (quickAreaPerPiece() * qty) + waste;
+    document.getElementById('quickAreaDisplay').value = area.toFixed(2);
+    const pricePerUnit = parseFloat(document.getElementById('quickPricePerUnit').value) || 0;
+    document.getElementById('quickTotalPrice').value = (area * pricePerUnit).toFixed(2);
+}
+
+document.getElementById('quickProduct').addEventListener('change', function() {
+    const opt = this.selectedOptions[0];
+    const note = document.getElementById('quickStockNote');
+    if (!opt || !opt.value) { note.innerText = ''; return; }
+    document.getElementById('quickPricePerUnit').value = parseFloat(opt.dataset.price).toFixed(2);
+    note.innerText = parseFloat(opt.dataset.area).toFixed(2) + ' ' + opt.dataset.unit + ' available in stock.';
+    recalcQuick();
+});
+['quickWidth','quickLength','quickQty','quickWaste','quickPricePerUnit'].forEach(id => {
+    document.getElementById(id).addEventListener('input', recalcQuick);
+});
+
+// Picks the size batch to attach the sale line to: prefers one that has enough
+// area left and whose slab size can fit the cut (either orientation), then any
+// with enough area, then the one with the most area left. If the sale needs
+// more than that batch holds, the server draws the rest from the product's
+// other batches automatically.
+function findBatchForProduct(productName, areaNeeded, reqWidth, reqLength) {
+    const rows = Array.from(document.querySelectorAll('.prod-row')).filter(r => r.dataset.name === productName);
+    if (rows.length === 0) return null;
+    const left = r => parseFloat(r.dataset.totalArea) || 0;
+    const fits = (row) => {
+        const bw = parseFloat(row.dataset.width), bl = parseFloat(row.dataset.length);
+        return (bw >= reqWidth && bl >= reqLength) || (bw >= reqLength && bl >= reqWidth);
+    };
+    let candidate = rows.find(r => left(r) >= areaNeeded && fits(r));
+    if (!candidate) candidate = rows.find(r => left(r) >= areaNeeded);
+    if (!candidate) candidate = rows.slice().sort((x, y) => left(y) - left(x))[0];
+    return candidate;
+}
+
+function quickAddToCart() {
+    const opt = document.getElementById('quickProduct').selectedOptions[0];
+    if (!opt || !opt.value) { alert('Please select a Product.'); return; }
+    const productName = opt.value;
+
+    const qty = parseInt(document.getElementById('quickQty').value) || 0;
+    if (qty <= 0) { alert('Enter a quantity greater than 0.'); return; }
+
+    const width = parseFloat(document.getElementById('quickWidth').value) || 0;
+    const length = parseFloat(document.getElementById('quickLength').value) || 0;
+    if (width <= 0 || length <= 0) { alert('Enter Width and Length greater than 0.'); return; }
+
+    const waste = parseFloat(document.getElementById('quickWaste').value) || 0;
+    if (waste < 0) { alert('Waste cannot be negative.'); return; }
+
+    const orderedArea = quickAreaPerPiece() * qty;
+    const area = orderedArea + waste;
+    if (!hasEnoughArea(productName, opt.dataset.unit, area)) return;
+
+    const row = findBatchForProduct(productName, area, width, length);
+    if (!row) { alert(productName + ' has no stock yet — add inventory for it first.'); return; }
+
+    const price = parseFloat(document.getElementById('quickPricePerUnit').value) || 0;
+    const cost = parseFloat(row.dataset.cost) || 0;
+    const amount = area * price;
+    const profit = (price - cost) * area;
+
+    if (price < cost) {
+        if (!confirm('This sale price is BELOW the purchase cost — you will make a LOSS of ' +
+                      Math.abs(profit).toFixed(2) + ' on this item. Continue anyway?')) {
+            return;
+        }
+    }
+
+    cart.push({
+        inventory_id: parseInt(row.dataset.id),
+        item_name: productName,
+        pieces: qty,
+        width: width,
+        length: length,
+        unit: row.dataset.unit,
+        waste: waste,
+        area: area,
+        price_per_unit: price,
+        amount: amount,
+        _profit_preview: profit
+    });
+    renderCart();
+
+    document.getElementById('quickProduct').value = '';
+    document.getElementById('quickWidth').value = '';
+    document.getElementById('quickLength').value = '';
+    document.getElementById('quickQty').value = 1;
+    document.getElementById('quickWaste').value = 0;
+    document.getElementById('quickPricePerUnit').value = '';
+    document.getElementById('quickAreaDisplay').value = '0.00';
+    document.getElementById('quickTotalPrice').value = '0.00';
+    document.getElementById('quickStockNote').innerText = '';
+}
+</script>
+{% endblock %}

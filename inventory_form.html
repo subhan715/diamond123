@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit Item" if item else "Add Inventory" }}{% endblock %}
+{% block content %}
+{% set active = "inventory_add" %}
+<h2 class="page-title">{{ "Edit Inventory Item" if item else "Add New Inventory" }}</h2>
+{% if item %}
+<div class="page-sub">Enter item details — width, length, thickness and pieces have quick +/- buttons</div>
+{% else %}
+<div class="page-sub">Pick a reusable Product (or create one), then add this batch of stock — new stock for an existing product (a different size, another delivery) is added straight into that same product's inventory.</div>
+{% endif %}
+
+<form class="form-card" method="POST" id="invForm">
+    {% if item %}
+    <div class="form-row">
+        <div class="form-group">
+            <label>Item Name *</label>
+            <input type="text" name="item_name" required value="{{ item.item_name }}">
+        </div>
+        <div class="form-group">
+            <label>Material Type *</label>
+            <select name="material_type">
+                {% for m in ["Marble","Granite","Quartz","Sandstone","Other"] %}
+                <option value="{{ m }}" {{ "selected" if item.material_type==m }}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Color / Variety</label>
+            <input type="text" name="color" value="{{ item.color }}">
+        </div>
+        <div class="form-group">
+            <label>Supplier</label>
+            <input type="text" name="supplier" value="{{ item.supplier }}">
+        </div>
+    </div>
+    {% else %}
+    <div class="form-group">
+        <label>Product *</label>
+        <select name="product_id" id="productSelect">
+            <option value="__new__" {{ "selected" if not preselect_product_id }}>+ Create New Product</option>
+            {% for p in products %}
+            <option value="{{ p.id }}" {{ "selected" if preselect_product_id==p.id }}>
+                {{ p.name }} ({{ p.material_type }}{{ " · " ~ p.color if p.color }}) — {{ "%.2f"|format(p.total_area) }} {{ p.unit }} left
+            </option>
+            {% endfor %}
+        </select>
+        <div style="font-size:11px; color:#7f8c8d; margin-top:3px;">Choose an existing product to add more stock to it, or create a new one below.</div>
+    </div>
+
+    <div id="newProductFields">
+        <div class="form-row">
+            <div class="form-group">
+                <label>New Product Name *</label>
+                <input type="text" name="new_product_name" id="newProductName" value="">
+            </div>
+            <div class="form-group">
+                <label>Material Type *</label>
+                <select name="material_type" id="materialType">
+                    {% for m in ["Marble","Granite","Quartz","Sandstone","Other"] %}
+                    <option value="{{ m }}">{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Color / Variety</label>
+                <input type="text" name="color" id="colorInput" value="">
+            </div>
+        </div>
+    </div>
+
+    <div id="existingProductInfo" style="display:none; background:#f4f6f7; border:1px solid #dfe4e6; border-radius:6px; padding:10px 14px; margin-bottom:14px; font-size:14px;">
+        Adding stock to <b id="existingProductName"></b> — <span id="existingProductMeta"></span>
+    </div>
+
+    <div class="form-group">
+        <label>Supplier (for this batch)</label>
+        <input type="text" name="supplier" value="">
+    </div>
+    {% endif %}
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Width (inches) *</label>
+            <div class="stepper">
+                <button type="button" onclick="step('width',-1)">−</button>
+                <input type="number" step="0.01" id="width" name="width" required value="{{ item.width if item else 24 }}">
+                <button type="button" onclick="step('width',1)">+</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Length (inches) *</label>
+            <div class="stepper">
+                <button type="button" onclick="step('length',-1)">−</button>
+                <input type="number" step="0.01" id="length" name="length" required value="{{ item.length if item else 24 }}">
+                <button type="button" onclick="step('length',1)">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group" style="flex:1;">
+            <div style="background:#f4f6f7; border:1px solid #dfe4e6; border-radius:6px; padding:10px 14px; font-size:15px;">
+                <span id="sqftFormula">W x L</span> = <b id="sqftResult">0.00</b> <span id="sqftUnit">Sq.Ft</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Thickness (mm)</label>
+            <div class="stepper">
+                <button type="button" onclick="step('thickness',-1)">−</button>
+                <input type="number" step="0.01" id="thickness" name="thickness" value="{{ item.thickness if item else 18 }}">
+                <button type="button" onclick="step('thickness',1)">+</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Pieces (Quantity) *</label>
+            <div class="stepper">
+                <button type="button" onclick="step('pieces',-1)">−</button>
+                <input type="number" step="1" id="pieces" name="pieces" required value="{{ item.pieces if item else 1 }}">
+                <button type="button" onclick="step('pieces',1)">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Area Unit</label>
+            <select id="unit" name="unit">
+                <option value="Sq.Ft" {{ "selected" if item and item.unit=="Sq.Ft" }}>Sq.Ft</option>
+                <option value="Sq.Meter" {{ "selected" if item and item.unit=="Sq.Meter" }}>Sq.Meter</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Purchase Price (Cost) per Unit *</label>
+            <input type="number" step="0.01" id="purchasePrice" name="purchase_price_per_unit" required
+                   value="{{ item.purchase_price_per_unit if item else 0 }}"
+                   style="border-color:#e67e22;">
+            <div style="font-size:11px; color:#7f8c8d; margin-top:3px;">What YOU paid per unit area</div>
+        </div>
+        <div class="form-group">
+            <label>Expected Selling Price per Unit *</label>
+            <input type="number" step="0.01" id="sellingPrice" name="selling_price_per_unit" required
+                   value="{{ item.selling_price_per_unit if item else 0 }}"
+                   style="border-color:#16a085;">
+            <div style="font-size:11px; color:#7f8c8d; margin-top:3px;">What you plan to charge (can be overridden at sale time)</div>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Notes</label>
+        <textarea name="notes" rows="2">{{ item.notes if item else '' }}</textarea>
+    </div>
+
+    <div class="summary-box">
+        <div style="color:#e67e22; font-weight:bold;">Total Investment (cost): <span id="totalCost">-</span></div>
+        <div style="color:#16a085; font-weight:bold;">Total Expected Sale Value: <span id="totalValue">-</span></div>
+        <div class="total">Expected Profit if sold at asking price: <span id="expectedProfit">-</span></div>
+    </div>
+
+    <button type="submit" class="btn btn-green">{{ "Update Item" if item else "Save to Inventory" }}</button>
+    {% if item %}<a href="{{ url_for('inventory_list') }}" class="btn btn-gray">Cancel</a>{% endif %}
+</form>
+
+<script>
+function step(id, delta) {
+    const el = document.getElementById(id);
+    let v = parseFloat(el.value) || 0;
+    v = Math.max(0, v + delta);
+    el.value = (id === 'pieces') ? Math.round(v) : v.toFixed(2);
+    recalc();
+}
+function recalc() {
+    const w = parseFloat(document.getElementById('width').value) || 0;
+    const l = parseFloat(document.getElementById('length').value) || 0;
+    const pcs = parseFloat(document.getElementById('pieces').value) || 0;
+    const purchasePrice = parseFloat(document.getElementById('purchasePrice').value) || 0;
+    const sellingPrice = parseFloat(document.getElementById('sellingPrice').value) || 0;
+    const unit = document.getElementById('unit').value;
+    let areaPiece = unit === 'Sq.Ft' ? (w * l) / 144.0 : (w * 0.0254) * (l * 0.0254);
+    let totalArea = areaPiece * pcs;
+    let totalCost = totalArea * purchasePrice;
+    let totalValue = totalArea * sellingPrice;
+    let expectedProfit = totalValue - totalCost;
+
+    document.getElementById('sqftFormula').innerText = w.toFixed(2) + ' x ' + l.toFixed(2);
+    document.getElementById('sqftResult').innerText = areaPiece.toFixed(2);
+    document.getElementById('sqftUnit').innerText = unit;
+
+    document.getElementById('totalCost').innerText = totalCost.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('totalValue').innerText = totalValue.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    const profitEl = document.getElementById('expectedProfit');
+    profitEl.innerText = expectedProfit.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    profitEl.style.color = expectedProfit < 0 ? '#c0392b' : '#16a085';
+}
+['width','length','pieces','purchasePrice','sellingPrice','unit'].forEach(id => {
+    document.getElementById(id).addEventListener('input', recalc);
+    document.getElementById(id).addEventListener('change', recalc);
+});
+recalc();
+
+{% if not item %}
+const PRODUCTS = {{ products|tojson }};
+
+function applyProductSelection() {
+    const select = document.getElementById('productSelect');
+    const newFields = document.getElementById('newProductFields');
+    const existingInfo = document.getElementById('existingProductInfo');
+    const nameInput = document.getElementById('newProductName');
+
+    if (select.value === '__new__') {
+        newFields.style.display = '';
+        existingInfo.style.display = 'none';
+        nameInput.required = true;
+        return;
+    }
+    newFields.style.display = 'none';
+    nameInput.required = false;
+    const product = PRODUCTS.find(p => String(p.id) === select.value);
+    if (!product) { existingInfo.style.display = 'none'; return; }
+
+    existingInfo.style.display = '';
+    document.getElementById('existingProductName').innerText = product.name;
+    document.getElementById('existingProductMeta').innerText =
+        product.material_type + (product.color ? ' · ' + product.color : '') +
+        ' — ' + product.total_area.toFixed(2) + ' ' + product.unit + ' already in stock';
+
+    // Pre-fill this new batch's prices from the product's usual prices -
+    // still editable, since a fresh delivery can cost more or less.
+    document.getElementById('purchasePrice').value = product.purchase_price_per_unit;
+    document.getElementById('sellingPrice').value = product.selling_price_per_unit;
+    document.getElementById('unit').value = product.unit;
+    recalc();
+}
+
+document.getElementById('productSelect').addEventListener('change', applyProductSelection);
+applyProductSelection();
+{% endif %}
+</script>
+{% endblock %}

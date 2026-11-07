@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order.order_no }}{% endblock %}
+{% block content %}
+{% set active = "orders_list" %}
+<h2 class="page-title">Order {{ order.order_no }}</h2>
+<div class="page-sub">
+    Status:
+    {% if order.status == 'Pending' %}<span class="badge badge-pending">Pending</span>
+    {% elif order.status == 'Processed' %}<span class="badge badge-processed">Processed</span>
+    {% else %}<span class="badge badge-cancelled">Cancelled</span>{% endif %}
+</div>
+
+<div class="form-card" style="max-width:900px;">
+    <div class="form-row">
+        <div><b>Customer:</b> {{ order.customer_name }}</div>
+        <div><b>Phone:</b> {{ order.phone }}</div>
+    </div>
+    <div class="form-row">
+        <div><b>Address:</b> {{ order.address or '—' }}</div>
+        <div><b>Order Date:</b> {{ order.order_date }}</div>
+    </div>
+    {% if order.notes %}<div><b>Notes:</b> {{ order.notes }}</div>{% endif %}
+
+    {% if order.drawing_filename or order.drawing_notes %}
+    <div style="margin-top:16px; padding:12px; border:1px dashed #bbb; border-radius:6px; background:#fafafa;">
+        <b>📐 Drawing / Cutting Template</b>
+        {% if order.drawing_notes %}<div style="margin-top:6px;">{{ order.drawing_notes }}</div>{% endif %}
+        {% if order.drawing_filename %}
+            {% set ext = order.drawing_filename.rsplit('.', 1)[-1].lower() %}
+            <div style="margin-top:8px;">
+            {% if ext == 'pdf' %}
+                <a href="{{ url_for('static', filename='uploads/drawings/' ~ order.drawing_filename) }}" target="_blank" class="btn btn-gray btn-sm">📄 View Drawing PDF</a>
+            {% else %}
+                <a href="{{ url_for('static', filename='uploads/drawings/' ~ order.drawing_filename) }}" target="_blank">
+                    <img src="{{ url_for('static', filename='uploads/drawings/' ~ order.drawing_filename) }}" alt="Order drawing" style="max-width:280px; max-height:280px; border:1px solid #ddd; border-radius:4px;">
+                </a>
+            {% endif %}
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <h3 style="margin-top:20px;">Order Items</h3>
+    <table>
+        <thead><tr><th>Item</th><th>Pieces</th><th>Size (W x L)</th></tr></thead>
+        <tbody>
+        {% for it in items %}
+        <tr>
+            <td>{{ it.item_name }}</td>
+            <td>{{ it.pieces }}</td>
+            <td>{{ "%.2f"|format(it.width) }} x {{ "%.2f"|format(it.length) }} in</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if order.status == 'Pending' %}
+    <div style="margin-top:20px; display:flex; gap:10px;">
+        <form method="POST" action="{{ url_for('order_process', order_id=order.id) }}"
+              onsubmit="return confirm('Process this order? This will deduct stock and generate the Delivery Note / Challan. The Invoice is generated automatically once you mark it Delivered.');">
+            <button type="submit" class="btn btn-green" style="padding:14px 24px; font-size:15px;">
+                ✔ Process Order → Create Delivery Note / Challan
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('order_cancel', order_id=order.id) }}"
+              onsubmit="return confirm('Cancel this order?');">
+            <button type="submit" class="btn btn-red">Cancel Order</button>
+        </form>
+    </div>
+    {% else %}
+    <p style="color:#16a085; font-weight:bold; margin-top:16px;">
+        ✔ This order has already been processed. Check the Deliveries page for the Challan, and the Invoices page once it's marked Delivered.
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

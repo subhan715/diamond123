@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block content %}
+{% set active = "orders_list" %}
+<h2 class="page-title">Orders</h2>
+<div class="search-bar">
+    <form method="GET" style="display:flex; gap:8px;">
+        <input type="text" name="q" placeholder="Search order # or customer..." value="{{ search }}">
+        <button class="btn btn-blue" type="submit">Search</button>
+    </form>
+    <a href="{{ url_for('orders_new') }}" class="btn btn-orange">+ New Order</a>
+</div>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Order #</th><th>Date</th><th>Customer</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody>
+{% for o in orders %}
+<tr>
+    <td>{{ o.order_no }}</td>
+    <td>{{ o.order_date }}</td>
+    <td>{{ o.customer_name }}</td>
+    <td>{{ o.phone }}</td>
+    <td>
+        {% if o.status == 'Pending' %}<span class="badge badge-pending">Pending</span>
+        {% elif o.status == 'Processed' %}<span class="badge badge-processed">Processed</span>
+        {% else %}<span class="badge badge-cancelled">Cancelled</span>{% endif %}
+    </td>
+    <td><a href="{{ url_for('order_detail', order_id=o.id) }}" class="btn btn-blue btn-sm">View</a></td>
+</tr>
+{% else %}
+<tr><td colspan="6" style="text-align:center;">No orders yet.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

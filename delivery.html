@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Delivery {{ delivery.delivery_no }}{% endblock %}
+{% block content %}
+{% set active = "deliveries_list" %}
+
+<div class="print-page">
+    <div class="print-header">
+        <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Diamond Marble & Granite">
+        <h1>Diamond Marble &amp; Granite</h1>
+        <div>Delivery Note / Challan</div>
+    </div>
+    <div class="print-meta">
+        <div>
+            <div><b>Delivery #:</b> {{ delivery.delivery_no }}</div>
+            <div><b>Date:</b> {{ delivery.delivery_date }}</div>
+            {% if invoice %}<div><b>Invoice #:</b> {{ invoice.invoice_no }}</div>
+            {% else %}<div style="color:#888;"><b>Invoice:</b> will be generated automatically once Delivered</div>{% endif %}
+        </div>
+        <div>
+            <div><b>Customer:</b> {{ delivery.customer_name }}</div>
+            <div><b>Phone:</b> {{ delivery.phone }}</div>
+            <div><b>Address:</b> {{ delivery.address or '—' }}</div>
+        </div>
+    </div>
+
+    <table>
+        <thead><tr><th>Item</th><th>Pieces</th><th>Size</th></tr></thead>
+        <tbody>
+        {% for it in items %}
+        <tr>
+            <td>{{ it.item_name }}</td>
+            <td>{{ it.pieces }}</td>
+            <td>{{ "%.2f"|format(it.width) }} x {{ "%.2f"|format(it.length) }} in</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if order and (order.drawing_filename or order.drawing_notes) %}
+    <div style="margin-top:16px; padding:12px; border:1px dashed #bbb; border-radius:6px;">
+        <b>📐 Drawing / Cutting Template for installer:</b>
+        {% if order.drawing_notes %}<div style="margin-top:6px;">{{ order.drawing_notes }}</div>{% endif %}
+        {% if order.drawing_filename %}
+            {% set ext = order.drawing_filename.rsplit('.', 1)[-1].lower() %}
+            <div style="margin-top:8px;">
+            {% if ext == 'pdf' %}
+                <a href="{{ url_for('static', filename='uploads/drawings/' ~ order.drawing_filename) }}" target="_blank" class="btn btn-gray btn-sm">📄 View Drawing PDF</a>
+            {% else %}
+                <img src="{{ url_for('static', filename='uploads/drawings/' ~ order.drawing_filename) }}" alt="Order drawing" style="max-width:260px; max-height:260px; border:1px solid #ddd; border-radius:4px;">
+            {% endif %}
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div style="margin-top:20px;">
+        <b>Delivery Status:</b>
+        {% if delivery.status == 'Ready for Delivery' %}<span class="badge badge-ready">Ready for Delivery</span>
+        {% elif delivery.status == 'Out for Delivery' %}<span class="badge badge-out">Out for Delivery</span>
+        {% else %}<span class="badge badge-delivered">Delivered</span>{% endif %}
+    </div>
+
+    <div style="margin-top:40px; display:flex; justify-content:space-between;">
+        <div>Received by: _____________________</div>
+        <div>Signature: _____________________</div>
+    </div>
+
+    <div class="no-print-actions">
+        <button class="btn btn-blue" onclick="window.print()">🖨 Print Delivery Note</button>
+        <a href="{{ url_for('deliveries_list') }}" class="btn btn-gray">Back to Deliveries</a>
+        <form method="POST" action="{{ url_for('delivery_status', delivery_id=delivery.id) }}" style="display:inline;">
+            <select name="status">
+                <option value="Ready for Delivery" {{ "selected" if delivery.status=="Ready for Delivery" }}>Ready for Delivery</option>
+                <option value="Out for Delivery" {{ "selected" if delivery.status=="Out for Delivery" }}>Out for Delivery</option>
+                <option value="Delivered" {{ "selected" if delivery.status=="Delivered" }}>Delivered</option>
+            </select>
+            <button type="submit" class="btn btn-green">Update Status</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

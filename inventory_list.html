@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Inventory List{% endblock %}
+{% block content %}
+{% set active = "inventory_list" %}
+<h2 class="page-title">Inventory List</h2>
+<div class="search-bar">
+    <form method="GET" style="display:flex; gap:8px;">
+        <input type="text" name="q" placeholder="Search item, material, color..." value="{{ search }}">
+        <button class="btn btn-blue" type="submit">Search</button>
+    </form>
+    <a href="{{ url_for('inventory_add') }}" class="btn btn-green">+ Add Item</a>
+</div>
+
+<h3 style="margin-top:0;">Products</h3>
+<div class="page-sub" style="margin-top:-6px;">Each product's stock is the total of every size batch added to it. Use "+ Add Stock" to add more of the SAME product.</div>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Product</th><th>Material</th><th>Color</th><th>Sizes</th><th>Pieces</th><th>Area Left</th>
+<th>Investment</th><th>Expected Value</th><th>Actions</th>
+</tr></thead>
+<tbody>
+{% for p in products %}
+<tr class="{{ 'low-stock' if p.name|lower in low_names }}">
+    <td>{{ p.name }}</td>
+    <td>{{ p.material_type }}</td>
+    <td>{{ p.color }}</td>
+    <td>{{ p.batch_count }}</td>
+    <td>{{ p.total_pieces }}</td>
+    <td>{{ "%.2f"|format(p.total_area) }}</td>
+    <td style="color:#e67e22;">{{ "%.2f"|format(p.total_cost_value) }}</td>
+    <td style="color:#16a085;">{{ "%.2f"|format(p.total_value) }}</td>
+    <td><a href="{{ url_for('inventory_add', product_id=p.id) }}" class="btn btn-green btn-sm">+ Add Stock</a></td>
+</tr>
+{% else %}
+<tr><td colspan="9" style="text-align:center;">No products yet — add inventory below to create your first product.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<h3 style="margin-top:22px;">All Size Batches</h3>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Item</th><th>Material</th><th>Color</th><th>Width</th><th>Length</th><th>Thick</th>
+<th>Pieces</th><th>Unit</th><th>Area Left</th><th>Purchase Price</th><th>Selling Price</th>
+<th>Investment</th><th>Expected Value</th><th>Actions</th>
+</tr></thead>
+<tbody>
+{% for it in items %}
+<tr class="{{ 'low-stock' if it.item_name|lower in low_names }}">
+    <td>{{ it.item_name }}</td>
+    <td>{{ it.material_type }}</td>
+    <td>{{ it.color }}</td>
+    <td>{{ "%.2f"|format(it.width) }}</td>
+    <td>{{ "%.2f"|format(it.length) }}</td>
+    <td>{{ "%.2f"|format(it.thickness) }}</td>
+    <td>{{ it.pieces }}</td>
+    <td>{{ it.unit }}</td>
+    <td>{{ "%.2f"|format(it.total_area) }}</td>
+    <td style="color:#e67e22;">{{ "%.2f"|format(it.purchase_price_per_unit) }}</td>
+    <td style="color:#16a085;">{{ "%.2f"|format(it.selling_price_per_unit) }}</td>
+    <td>{{ "%.2f"|format(it.total_cost_value) }}</td>
+    <td>{{ "%.2f"|format(it.total_value) }}</td>
+    <td>
+        <a href="{{ url_for('inventory_edit', item_id=it.id) }}" class="btn btn-blue btn-sm">Edit</a>
+        <form method="POST" action="{{ url_for('inventory_delete', item_id=it.id) }}" style="display:inline"
+              onsubmit="return confirm('Delete this item permanently?');">
+            <button type="submit" class="btn btn-red btn-sm">Delete</button>
+        </form>
+    </td>
+</tr>
+{% else %}
+<tr><td colspan="14" style="text-align:center;">No inventory items found.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

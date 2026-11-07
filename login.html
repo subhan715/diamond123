@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Diamond Marble & Granite</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" href="{{ url_for('static', filename='logo.jpg') }}">
+<style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    .login-box {
+        background:white; border:1px solid #ddd; border-radius:6px; padding:36px;
+        width:100%; max-width:360px; text-align:center;
+    }
+    .login-box img { width:72px; height:72px; object-fit:cover; border-radius:50%; margin-bottom:10px; border:2px solid #eee; }
+    .login-box h1 { font-size:20px; margin:0 0 4px; }
+    .login-box .sub { color:#7f8c8d; font-size:13px; margin-bottom:22px; }
+    .login-box .form-group { text-align:left; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<div class="login-box">
+    <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Diamond Marble & Granite">
+    <h1>Diamond Marble &amp; Granite</h1>
+    <div class="sub">Please log in to continue</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, msg in messages %}
+                <div class="flash flash-{{ 'error' if category=='error' else 'success' }}">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" name="username" required autofocus>
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-blue" style="width:100%; padding:12px;">Log In</button>
+    </form>
+</div>
+</body>
+</html>

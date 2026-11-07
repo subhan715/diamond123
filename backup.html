@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Backup & Restore{% endblock %}
+{% block content %}
+{% set active = "backup_page" %}
+<h2 class="page-title">💾 Backup &amp; Restore</h2>
+<div class="page-sub">Move your data to a new computer, or save a safety copy</div>
+
+{% if trial_mode %}
+<div class="form-card" style="max-width:640px; text-align:center; padding:40px 30px;">
+    <div style="font-size:40px; margin-bottom:8px;">🔒</div>
+    <h3 style="margin-top:0;">Backup &amp; Restore — available in the licensed version</h3>
+    <p style="color:#555; font-size:14px; max-width:480px; margin:0 auto;">
+        This trial copy has Backup &amp; Restore turned off. Everything else — Inventory, POS,
+        Orders, Invoices, Deliveries — works normally so you can fully test the software.
+        Contact us to activate your license and unlock backups.
+    </p>
+</div>
+{% else %}
+<div style="display:flex; gap:20px; flex-wrap:wrap;">
+
+    <div class="form-card" style="flex:1; min-width:320px;">
+        <h3 style="margin-top:0;">⬇ Download Backup</h3>
+        <p style="color:#555; font-size:14px;">
+            This saves ALL your data — inventory, orders, invoices and deliveries —
+            into one file. Current data size: <b>{{ db_size_kb }} KB</b>.
+        </p>
+        <form method="POST" action="{{ url_for('backup_download') }}">
+            <div class="form-group">
+                <label>Backup Password</label>
+                <input type="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-blue" style="margin-top:6px;">⬇ Download Backup File</button>
+        </form>
+        <p style="color:#7f8c8d; font-size:12px; margin-top:12px;">
+            Save the downloaded <code>.db</code> file somewhere safe (USB drive, Google Drive, email
+            to yourself). You'll use this exact file when setting up on a new laptop.
+        </p>
+    </div>
+
+    <div class="form-card" style="flex:1; min-width:320px;">
+        <h3 style="margin-top:0; color:#c0392b;">⬆ Restore from Backup</h3>
+        <p style="color:#555; font-size:14px;">
+            Use this when setting up on a <b>new laptop</b>, or to load a previous
+            backup. <b style="color:#c0392b;">Warning: this replaces all data currently
+            on THIS computer</b> with the data from the backup file.
+        </p>
+        <form method="POST" action="{{ url_for('backup_restore') }}" enctype="multipart/form-data"
+              onsubmit="return confirm('This will REPLACE all current data on this computer with the backup file. Continue?');">
+            <div class="form-group">
+                <label>Backup Password</label>
+                <input type="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <label>Backup File (.db)</label>
+                <input type="file" name="backup_file" accept=".db" required>
+            </div>
+            <button type="submit" class="btn btn-red" style="margin-top:6px;">⬆ Restore This Backup</button>
+        </form>
+        <p style="color:#7f8c8d; font-size:12px; margin-top:12px;">
+            For safety, a copy of whatever was here before is automatically saved
+            next to the software before restoring, just in case.
+        </p>
+    </div>
+
+</div>
+
+<div class="form-card" style="margin-top:20px; max-width:900px;">
+    <h3 style="margin-top:0;">📋 How to move to a new laptop — step by step</h3>
+    <ol style="line-height:1.9; color:#333;">
+        <li>On your <b>old laptop</b>: open this Backup &amp; Restore page, enter the password,
+            click <b>Download Backup File</b>. Save it somewhere (USB drive, email, cloud drive).</li>
+        <li>On your <b>new laptop</b>: install the software fresh (unzip the folder, run the
+            Start file, following the README as usual).</li>
+        <li>Open the new install in a browser, go to <b>Backup &amp; Restore</b> in the sidebar.</li>
+        <li>Enter the password, choose the backup file you saved, click <b>Restore This Backup</b>.</li>
+        <li>Done — your inventory, orders, invoices, and deliveries are all there on the new laptop.</li>
+    </ol>
+    <p style="color:#7f8c8d; font-size:13px;">
+        The backup password is set in the file <code>config.py</code> in the software folder.
+        Only people who know this password can download or restore a backup, since restoring
+        replaces all current data.
+    </p>
+</div>
+{% endif %}
+{% endblock %}
